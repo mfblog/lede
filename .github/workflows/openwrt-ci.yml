@@ -1,5 +1,5 @@
 #设置编译名称
-name: 自定义yml编译测试
+name: 自定义yml
 #设置触发事件
 on: push
 #设置编译环境
@@ -19,42 +19,7 @@ jobs:
         ./scripts/feeds install -a
     - name: 设置配置文件
       run: |
-        sudo rm -f ./.config*
-        sudo touch ./.config
-
-        # ========================固件定制部分========================
-
-        # 编译x64固件:
-        cat >> .config <<EOF
-        CONFIG_TARGET_ramips=y
-        CONFIG_TARGET_ramips_mt7621=y
-        CONFIG_TARGET_ramips_mt7621_DEVICE_d-team_newifi-d2=y
-        EOF
-
-        # 固件压缩:
-        cat >> .config <<EOF
-        CONFIG_TARGET_IMAGES_GZIP=y
-        EOF
-
-        # IPv6支持:
-        cat >> .config <<EOF
-        CONFIG_PACKAGE_dnsmasq_full_dhcpv6=y
-        CONFIG_PACKAGE_ipv6helper=y
-        EOF
-
-        # 常用LuCI插件选择:
-        cat >> .config <<EOF
-        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Kcptun=y
-        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks=y
-        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_ShadowsocksR_Server=y
-        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_ShadowsocksR_Socks=y
-        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_V2ray=y
-        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Trojan=y
-        EOF
-
-        # ========================固件定制部分结束========================
-
-        sed -i 's/^[ \t]*//g' ./.config
+        cd openwrt
         make defconfig
     - name: 下载第三方软件包
       run: |
