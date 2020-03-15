@@ -1,34 +1,84 @@
-name: Build OpenWrt
+#设置编译名称
+name: 自定义yml测试
+#设置触发事件
 on: push
+#设置编译环境
 jobs:
   build:
     runs-on: ubuntu-18.04
     steps:
-    - name: Installation depends
+    - name: 安装依赖软件包
       run: |
-        sudo apt-get update
-        sudo apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint
-    - name: Clone source code
+          docker rmi `docker images -q`
+          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d
+          sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php*
+          sudo -E apt-get update
+          sudo -E apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev patch python3.5 unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex node-uglify gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx-ucl libelf-dev autoconf automake libtool autopoint device-tree-compiler libuv-dev g++-multilib linux-libc-dev
+          sudo -E apt-get -y autoremove --purge
+          sudo -E apt-get clean
+          df -h
+    - name: 获取Lede/openWrt代码
       run: |
-        git clone https://github.com/coolsnowwolf/lede
-        cd lede
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-    - name: Generate config file
+    - name: 设置配置文件
       run: |
-        cd lede
+        rm -f ./.config*
+        touch ./.config
+
+        # ========================固件定制部分========================
+
+        # 编译x64固件:
+        cat >> .config <<EOF
+        CONFIG_TARGET_ramips=y
+        CONFIG_TARGET_ramips_mt7621=y
+        CONFIG_TARGET_ramips_mt7621_DEVICE_d-team_newifi-d2=y
+        EOF
+
+        # 固件压缩:
+        cat >> .config <<EOF
+        CONFIG_TARGET_IMAGES_GZIP=y
+        EOF
+
+        # IPv6支持:
+        cat >> .config <<EOF
+        CONFIG_PACKAGE_dnsmasq_full_dhcpv6=y
+        CONFIG_PACKAGE_ipv6helper=y
+        EOF
+
+        # 常用LuCI插件选择:
+        cat >> .config <<EOF
+        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Kcptun=y
+        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks=y
+        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_ShadowsocksR_Server=y
+        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_ShadowsocksR_Socks=y
+        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_V2ray=y
+        CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Trojan=y
+        EOF
+
+        sed -i 's/^[ \t]*//g' ./.config
         make defconfig
-    - name: Download package
+    - name: 下载第三方软件包
       run: |
-        cd openwrt && make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
-    - name: Build
+        make download -j8
+        find ./dl/ -size -1024c -exec rm -f {} \;
+        df -h
+    - name: 开始编译
       run: |
-        cd openwrt
-        make -j$(nproc)
-    - name : Upload artifact
+        make -j$(nproc) || make V=s
+        echo "======================="
+        echo "Space usage:"
+        echo "======================="
+        df -h
+        echo "======================="
+        du -h --max-depth=1 ./ --exclude=build_dir --exclude=bin
+        du -h --max-depth=1 ./build_dir
+        du -h --max-depth=1 ./bin
+    - name: Prepare artifact
+      run: find ./bin/targets/ -type d -name "packages" | xargs rm -rf {}
+
+    - name: 打包上传
       uses: actions/upload-artifact@master
       with:
-        name: OpenWrt
+        name: OpenWrt firmware
         path: ./bin/targets/
