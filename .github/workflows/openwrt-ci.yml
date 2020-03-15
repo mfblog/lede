@@ -1,37 +1,34 @@
-#设置编译名称
-name: 自定义yml
-#设置触发事件
+name: Build OpenWrt
 on: push
-#设置编译环境
 jobs:
   build:
     runs-on: ubuntu-18.04
     steps:
-    - name: 安装依赖软件包
+    - name: Installation depends
       run: |
         sudo apt-get update
-        sudo apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev patch python3.5 unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex node-uglify gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx-ucl libelf-dev autoconf automake libtool autopoint device-tree-compiler libuv-dev g++-multilib linux-libc-dev
-    - name: 获取Lede/openWrt代码
+        sudo apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint
+    - name: Clone source code
       run: |
         git clone https://github.com/coolsnowwolf/lede
         cd lede
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-    - name: 设置配置文件
-      run: |
-        cd openwrt
-        make defconfig
-    - name: 下载第三方软件包
-      run: |
-        cd lede && make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
-    - name: 开始编译
+    - name: Generate config file
       run: |
         cd lede
+        make defconfig
+    - name: Download package
+      run: |
+        cd openwrt && make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+    - name: Build
+      run: |
+        cd openwrt
         make -j$(nproc)
-    - name : 打包上传
+    - name : Upload artifact
       uses: actions/upload-artifact@master
       with:
-        name: OpenWrt firmware
+        name: OpenWrt
         path: ./bin/targets/
